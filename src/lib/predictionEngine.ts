@@ -11,6 +11,58 @@ export interface TeamStats {
   last5Matches: ('W' | 'D' | 'L')[];
 }
 
+export interface FullOdds {
+  main: {
+    '1X2': { home: number; draw: number; away: number };
+    doubleChance: { '1X': number; '12': number; 'X2': number };
+    htft: { '1/1': number; '1/X': number; '1/2': number; 'X/1': number; 'X/X': number; 'X/2': number; '2/1': number; '2/X': number; '2/2': number };
+    exactScore: Record<string, number>;
+    totalGoals: { '0-1': number; '2-3': number; '4+': number };
+    overUnder: {
+      '0.5': { over: number; under: number };
+      '1.5': { over: number; under: number };
+      '2.5': { over: number; under: number };
+      '3.5': { over: number; under: number };
+    };
+  };
+  halfTime: {
+    '1X2': { home: number; draw: number; away: number };
+    doubleChance: { '1X': number; '12': number; 'X2': number };
+    exactScore: Record<string, number>;
+  };
+  goals: {
+    gng: { goal: number; noGoal: number };
+    btts: { yes: number; no: number };
+    bttsFirstHalf: { yes: number; no: number };
+    ftts: { home: number; away: number; none: number };
+  };
+  combo: {
+    '1X2_O1.5': { home: number; draw: number; away: number };
+    '1X2_O2.5': { home: number; draw: number; away: number };
+    '1X2_O3.5': { home: number; draw: number; away: number };
+    '1X2_GNG': { homeYes: number; homeNo: number; awayYes: number; awayNo: number; drawYes: number; drawNo: number };
+  };
+  teamTotals: {
+    home: {
+      '0.5': { over: number; under: number };
+      '1.5': { over: number; under: number };
+      '2.5': { over: number; under: number };
+      '3.5': { over: number; under: number };
+    };
+    away: {
+      '0.5': { over: number; under: number };
+      '1.5': { over: number; under: number };
+      '2.5': { over: number; under: number };
+      '3.5': { over: number; under: number };
+    };
+  };
+  special: {
+    oddEven: { odd: number; even: number };
+    firstGoalMinute: { '0-15': number; '16-30': number; '31-45': number; '46-60': number; '61-75': number; '76-90': number; 'None': number };
+    multiGoals: { '1-2': number; '1-3': number; '2-3': number; '2-4': number; '3-4': number; '3-5': number };
+  };
+}
+
 export interface Match {
   id: string;
   leagueId: string;
@@ -27,6 +79,10 @@ export interface Match {
     draw: number;
     away: number;
   };
+  fullOdds?: FullOdds;
+  isHotMatch?: boolean;
+  hotReason?: string;
+  liveEvent?: string;
 }
 
 export interface PredictionResult {
@@ -73,6 +129,135 @@ function calculateFormScore(last5: ('W' | 'D' | 'L')[]): number {
     if (result === 'D') return score + 1;
     return score;
   }, 0);
+}
+
+export function generateFullOdds(homePower: number, awayPower: number, base1X2: { home: number, draw: number, away: number }): FullOdds {
+  const diff = homePower - awayPower;
+  const homeFav = diff > 0;
+  
+  // Helper to add margin
+  const addMargin = (odds: number) => Math.max(1.01, Number((odds * 0.92).toFixed(2)));
+  
+  // Double Chance
+  const dc1X = addMargin(1 / ((1/base1X2.home) + (1/base1X2.draw)));
+  const dc12 = addMargin(1 / ((1/base1X2.home) + (1/base1X2.away)));
+  const dcX2 = addMargin(1 / ((1/base1X2.draw) + (1/base1X2.away)));
+
+  // Over/Under base probabilities based on power
+  const totalPower = homePower + awayPower;
+  const expectedGoals = (totalPower / 100) * 2.5; // Rough estimate
+  
+  const probO15 = Math.min(0.9, Math.max(0.4, expectedGoals / 3));
+  const probO25 = probO15 * 0.6;
+  const probO35 = probO25 * 0.5;
+  const probO05 = Math.min(0.95, probO15 * 1.2);
+
+  const ou = (prob: number) => ({
+    over: addMargin(1 / prob),
+    under: addMargin(1 / (1 - prob))
+  });
+
+  const bttsProb = Math.min(0.8, Math.max(0.3, 0.5 - Math.abs(diff)/200 + expectedGoals/10));
+
+  return {
+    main: {
+      '1X2': base1X2,
+      doubleChance: { '1X': dc1X, '12': dc12, 'X2': dcX2 },
+      htft: {
+        '1/1': addMargin(base1X2.home * 1.5), '1/X': addMargin(15.0), '1/2': addMargin(30.0),
+        'X/1': addMargin(base1X2.home * 2.5), 'X/X': addMargin(base1X2.draw * 1.5), 'X/2': addMargin(base1X2.away * 2.5),
+        '2/1': addMargin(30.0), '2/X': addMargin(15.0), '2/2': addMargin(base1X2.away * 1.5)
+      },
+      exactScore: {
+        '1-0': addMargin(base1X2.home * 3), '2-0': addMargin(base1X2.home * 4), '2-1': addMargin(base1X2.home * 4.5),
+        '0-0': addMargin(base1X2.draw * 2.5), '1-1': addMargin(base1X2.draw * 2), '2-2': addMargin(base1X2.draw * 4),
+        '0-1': addMargin(base1X2.away * 3), '0-2': addMargin(base1X2.away * 4), '1-2': addMargin(base1X2.away * 4.5),
+      },
+      totalGoals: {
+        '0-1': ou(probO15).under,
+        '2-3': addMargin(2.0),
+        '4+': ou(probO35).over
+      },
+      overUnder: {
+        '0.5': ou(probO05),
+        '1.5': ou(probO15),
+        '2.5': ou(probO25),
+        '3.5': ou(probO35)
+      }
+    },
+    halfTime: {
+      '1X2': {
+        home: addMargin(base1X2.home * 1.8),
+        draw: addMargin(base1X2.draw * 0.8),
+        away: addMargin(base1X2.away * 1.8)
+      },
+      doubleChance: {
+        '1X': addMargin(dc1X * 1.2),
+        '12': addMargin(dc12 * 1.5),
+        'X2': addMargin(dcX2 * 1.2)
+      },
+      exactScore: {
+        '0-0': addMargin(2.5), '1-0': addMargin(3.5), '0-1': addMargin(4.5), '1-1': addMargin(7.0)
+      }
+    },
+    goals: {
+      gng: { goal: ou(probO05).over, noGoal: ou(probO05).under },
+      btts: { yes: addMargin(1 / bttsProb), no: addMargin(1 / (1 - bttsProb)) },
+      bttsFirstHalf: { yes: addMargin(1 / (bttsProb * 0.3)), no: addMargin(1 / (1 - bttsProb * 0.3)) },
+      ftts: { home: addMargin(base1X2.home * 1.2), away: addMargin(base1X2.away * 1.2), none: ou(probO05).under }
+    },
+    combo: {
+      '1X2_O1.5': {
+        home: addMargin(base1X2.home * ou(probO15).over * 0.8),
+        draw: addMargin(base1X2.draw * ou(probO15).over * 0.8),
+        away: addMargin(base1X2.away * ou(probO15).over * 0.8)
+      },
+      '1X2_O2.5': {
+        home: addMargin(base1X2.home * ou(probO25).over * 0.8),
+        draw: addMargin(base1X2.draw * ou(probO25).over * 0.8),
+        away: addMargin(base1X2.away * ou(probO25).over * 0.8)
+      },
+      '1X2_O3.5': {
+        home: addMargin(base1X2.home * ou(probO35).over * 0.8),
+        draw: addMargin(base1X2.draw * ou(probO35).over * 0.8),
+        away: addMargin(base1X2.away * ou(probO35).over * 0.8)
+      },
+      '1X2_GNG': {
+        homeYes: addMargin(base1X2.home * (1/bttsProb) * 0.8),
+        homeNo: addMargin(base1X2.home * (1/(1-bttsProb)) * 0.8),
+        awayYes: addMargin(base1X2.away * (1/bttsProb) * 0.8),
+        awayNo: addMargin(base1X2.away * (1/(1-bttsProb)) * 0.8),
+        drawYes: addMargin(base1X2.draw * (1/bttsProb) * 0.8),
+        drawNo: addMargin(base1X2.draw * (1/(1-bttsProb)) * 0.8)
+      }
+    },
+    teamTotals: {
+      home: {
+        '0.5': ou(homeFav ? probO15 : probO15 * 0.7),
+        '1.5': ou(homeFav ? probO25 : probO25 * 0.7),
+        '2.5': ou(homeFav ? probO35 : probO35 * 0.7),
+        '3.5': ou(homeFav ? probO35 * 0.5 : probO35 * 0.3)
+      },
+      away: {
+        '0.5': ou(!homeFav ? probO15 : probO15 * 0.7),
+        '1.5': ou(!homeFav ? probO25 : probO25 * 0.7),
+        '2.5': ou(!homeFav ? probO35 : probO35 * 0.7),
+        '3.5': ou(!homeFav ? probO35 * 0.5 : probO35 * 0.3)
+      }
+    },
+    special: {
+      oddEven: { odd: 1.90, even: 1.90 },
+      firstGoalMinute: {
+        '0-15': addMargin(3.0), '16-30': addMargin(3.5), '31-45': addMargin(4.0),
+        '46-60': addMargin(4.5), '61-75': addMargin(5.0), '76-90': addMargin(5.5),
+        'None': ou(probO05).under
+      },
+      multiGoals: {
+        '1-2': addMargin(2.0), '1-3': addMargin(1.4), '2-3': addMargin(1.9),
+        '2-4': addMargin(1.5), '3-4': addMargin(2.4), '3-5': addMargin(2.2)
+      }
+    }
+  };
 }
 
 export function simulateScore(homeXG: number, awayXG: number, seedStr: string): { homeScore: number, awayScore: number } {

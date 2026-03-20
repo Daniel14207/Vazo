@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Match, analyzeMatch, simulateScore } from './predictionEngine';
+import { Match, analyzeMatch, simulateScore, generateFullOdds } from './predictionEngine';
 import { leagues, teamsByLeague } from './mockData';
 
 export type Phase = 'OPEN' | 'PLAYING' | 'FINISHED' | 'BREAK';
@@ -100,8 +100,20 @@ export function useVirtualLeague(): LeagueState[] {
           let homeScore = undefined;
           let awayScore = undefined;
           let status = match.status;
+          let liveEvent = undefined;
+          let odds = { ...match.odds };
           
-          if (slotStatus === 'FINISHED' || slotStatus === 'PLAYING') {
+          if (slotStatus === 'OPEN') {
+             const step = Math.floor(timeInSlot / 3000);
+             const seed = match.id + step;
+             let rng = 0;
+             for (let i = 0; i < seed.length; i++) rng += seed.charCodeAt(i);
+             const fluctuation = (Math.sin(rng) * 0.1) - 0.05;
+             
+             odds.home = Math.max(1.01, parseFloat((odds.home + fluctuation).toFixed(2)));
+             odds.draw = Math.max(1.01, parseFloat((odds.draw - fluctuation * 0.5).toFixed(2)));
+             odds.away = Math.max(1.01, parseFloat((odds.away - fluctuation * 0.5).toFixed(2)));
+          } else if (slotStatus === 'FINISHED' || slotStatus === 'PLAYING') {
              const score = simulateScore(prediction.expectedGoals.home, prediction.expectedGoals.away, match.id);
              
              if (slotStatus === 'FINISHED') {
@@ -113,6 +125,17 @@ export function useVirtualLeague(): LeagueState[] {
                homeScore = Math.floor(score.homeScore * Math.min(1, progress * 1.2));
                awayScore = Math.floor(score.awayScore * Math.min(1, progress * 1.2));
                status = 'LIVE';
+               
+               const step = Math.floor(timeInSlot / 5000);
+               const seed = match.id + step;
+               let rng = 0;
+               for (let i = 0; i < seed.length; i++) rng += seed.charCodeAt(i);
+               const eventRoll = Math.abs(Math.sin(rng));
+               
+               if (eventRoll > 0.9) liveEvent = 'GOAL!';
+               else if (eventRoll > 0.7) liveEvent = 'ATTACK';
+               else if (eventRoll > 0.5) liveEvent = 'FOUL';
+               else if (eventRoll > 0.4) liveEvent = 'CARD';
              }
           }
 
@@ -120,7 +143,9 @@ export function useVirtualLeague(): LeagueState[] {
             ...match,
             homeScore,
             awayScore,
-            status
+            status,
+            liveEvent,
+            odds
           };
         });
 
@@ -195,6 +220,26 @@ function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: numbe
     awayProb = Math.max(0.1, awayProb);
     drawProb = Math.max(0.1, drawProb);
 
+    let isHotMatch = false;
+    let hotReason = '';
+
+    if (homeProb > 0.75 || awayProb > 0.75) {
+      isHotMatch = true;
+      hotReason = '💎 VIP PICK';
+    } else if (homeAttack + awayAttack > 4.0) {
+      isHotMatch = true;
+      hotReason = '🔥 HOT MATCH';
+    } else if (Math.abs(homePower - awayPower) > 2.5) {
+      isHotMatch = true;
+      hotReason = '⚡ HIGH ODDS';
+    }
+
+    const baseOdds = {
+      home: parseFloat((1 / homeProb).toFixed(2)),
+      draw: parseFloat((1 / drawProb).toFixed(2)),
+      away: parseFloat((1 / awayProb).toFixed(2))
+    };
+
     matches.push({
       id: `m_${time.getTime()}_${league.id}_${i}`,
       leagueId: league.id,
@@ -204,11 +249,10 @@ function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: numbe
       status: 'NS',
       homeTeam,
       awayTeam,
-      odds: {
-        home: parseFloat((1 / homeProb).toFixed(2)),
-        draw: parseFloat((1 / drawProb).toFixed(2)),
-        away: parseFloat((1 / awayProb).toFixed(2))
-      }
+      isHotMatch,
+      hotReason,
+      odds: baseOdds,
+      fullOdds: generateFullOdds(homePower, awayPower, baseOdds)
     });
   }
   return matches;

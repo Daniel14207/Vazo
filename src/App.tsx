@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Menu, ShoppingCart, Star, ChevronRight, Clock, Flame, Trophy, TrendingUp, PlayCircle, Diamond, ArrowRightLeft, MoreHorizontal } from 'lucide-react';
+import { Menu, ShoppingCart, Star, ChevronRight, Clock, Flame, Trophy, TrendingUp, PlayCircle, Diamond, ArrowRightLeft, MoreHorizontal, CheckCircle, BarChart2 } from 'lucide-react';
 import { analyzeMatch } from './lib/predictionEngine';
 import { cn } from './lib/utils';
-import { leagues } from './lib/mockData';
+import { leagues, teamsByLeague } from './lib/mockData';
 import { useVirtualLeague } from './lib/virtualLeague';
 
 const TeamLogo = ({ team }: { team: { name: string, logo?: string } }) => {
@@ -18,10 +18,11 @@ const TeamLogo = ({ team }: { team: { name: string, logo?: string } }) => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('Tous');
+  const [activeTab, setActiveTab] = useState('All');
   const [activeNav, setActiveNav] = useState('TIPS');
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  const [selectedDateIndex, setSelectedDateIndex] = useState(1); // Default to today (index 1)
 
   const leagueStates = useVirtualLeague();
 
@@ -42,16 +43,31 @@ export default function App() {
     };
   }, [leagueStates]);
 
-  const dates = [
-    { day: 'Fri', date: 'Mar 13' },
-    { day: 'Sat', date: 'Mar 14' },
-    { day: 'Sun', date: 'Mar 15' },
-    { day: 'Mon', date: 'Mar 16' },
-    { day: 'Tue', date: 'Mar 17' },
-  ];
+  const today = new Date();
+  const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
+  
+  const dates = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - 1 + i);
+    return {
+      dateObj: d,
+      day: d.toLocaleString('default', { weekday: 'short' }),
+      date: d.getDate(),
+      isToday: i === 1,
+      isYesterday: i === 0,
+    };
+  });
 
-  const tabs = ['Tous', 'Populaire', 'Favoris'];
-  const navItems = [ { id: 'TIPS', icon: <Flame size={20} />, label: 'TIPS' }, { id: 'FREE', icon: <Trophy size={20} />, label: 'FREE' }, { id: 'BEST', icon: <TrendingUp size={20} />, label: 'BEST' }, { id: 'LIVE', icon: <PlayCircle size={20} />, label: 'LIVE' }, { id: 'VIP', icon: <Diamond size={20} />, label: 'VIP' }, { id: 'HT-FT', icon: <ArrowRightLeft size={20} />, label: 'HT-FT' }, { id: 'MORE', icon: <MoreHorizontal size={20} />, label: 'MORE' } ];
+  const tabs = ['All', 'Popular', 'Favorites', 'Leagues'];
+  const navItems = [ 
+    { id: 'TIPS', icon: <Flame size={20} />, label: 'TIPS' }, 
+    { id: 'FREE', icon: <Trophy size={20} />, label: 'FREE' }, 
+    { id: 'BEST', icon: <TrendingUp size={20} />, label: 'BEST' }, 
+    { id: 'LIVE', icon: <PlayCircle size={20} />, label: 'LIVE' }, 
+    { id: 'VIP', icon: <Diamond size={20} />, label: 'VIP' }, 
+    { id: 'RESULTS', icon: <CheckCircle size={20} />, label: 'RESULTS' }, 
+    { id: 'STATS', icon: <BarChart2 size={20} />, label: 'STATS' } 
+  ];
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -76,19 +92,29 @@ export default function App() {
       </header>
 
       {/* Date Selector */}
-      <div className="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar bg-[#1A1B2E]">
-        {dates.map((d, i) => (
-          <button
-            key={i}
-            className={cn(
-              "flex flex-col items-center justify-center min-w-[70px] py-2 rounded-md text-sm",
-              i === 0 ? "bg-[#2A2B4A] text-white" : "bg-[#2A2B4A]/50 text-gray-400"
-            )}
-          >
-            <span className="font-medium">{d.day}</span>
-            <span className="text-xs">{d.date}</span>
-          </button>
-        ))}
+      <div className="bg-[#1A1B2E] pt-2 pb-1">
+        <div className="text-center text-gray-400 text-sm font-semibold mb-2 tracking-widest">
+          {currentMonth}
+        </div>
+        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar pb-2">
+          {dates.map((d, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setSelectedDateIndex(i);
+                if (i === 0) setActiveNav('RESULTS');
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center min-w-[60px] py-2 rounded-lg text-sm transition-all",
+                selectedDateIndex === i ? "bg-[#FFC107] text-black shadow-md shadow-[#FFC107]/20" : "bg-[#2A2B4A] text-gray-400 hover:bg-[#2A2B4A]/80",
+                d.isToday && selectedDateIndex !== i && "border border-[#FFC107]/50"
+              )}
+            >
+              <span className="font-medium text-xs uppercase">{d.day}</span>
+              <span className={cn("text-lg font-bold", selectedDateIndex === i ? "text-black" : "text-white")}>{d.date}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -117,8 +143,110 @@ export default function App() {
         {(() => {
           if (leagueStates.length === 0) return null;
           
+          if (activeNav === 'RESULTS' || selectedDateIndex === 0) {
+            return (
+              <div className="p-4">
+                <h2 className="text-xl font-bold text-[#1A1B2E] mb-4 flex items-center gap-2">
+                  <CheckCircle className="text-green-500" /> RESULTS - {dates[0].day} {dates[0].date}
+                </h2>
+                {leagueStates.map(league => (
+                  <div key={league.leagueId} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3 bg-gray-100 p-2 rounded-lg border-l-4 border-[#2A3A5B]">
+                      {league.leagueLogo && <img src={league.leagueLogo} alt={league.leagueName} className="w-6 h-6 object-contain" />}
+                      <h3 className="font-bold text-[#2A3A5B]">{league.leagueName}</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {/* Mock results based on the league's teams */}
+                      {(() => {
+                        const teams = teamsByLeague[league.leagueId] || [];
+                        const results = [];
+                        for(let i=0; i<Math.min(4, Math.floor(teams.length/2)); i++) {
+                          const home = teams[i*2];
+                          const away = teams[i*2+1];
+                          // Generate deterministic mock scores based on team names
+                          const homeScore = (home.name.length * 7) % 4;
+                          const awayScore = (away.name.length * 3) % 4;
+                          results.push(
+                            <div key={i} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                              <div className="flex items-center gap-2 flex-1 justify-end">
+                                <span className="font-medium text-sm text-gray-800">{home.name}</span>
+                                <TeamLogo team={home} />
+                              </div>
+                              <div className="px-4 font-bold text-lg bg-gray-100 rounded mx-2 min-w-[60px] text-center">
+                                {homeScore} - {awayScore}
+                              </div>
+                              <div className="flex items-center gap-2 flex-1 justify-start">
+                                <TeamLogo team={away} />
+                                <span className="font-medium text-sm text-gray-800">{away.name}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return results;
+                      })()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          if (activeNav === 'STATS') {
+            return (
+              <div className="p-4">
+                <h2 className="text-xl font-bold text-[#1A1B2E] mb-4 flex items-center gap-2">
+                  <BarChart2 className="text-blue-500" /> LEAGUE STATS
+                </h2>
+                {leagues.map(league => (
+                  <div key={league.id} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3 bg-gray-100 p-2 rounded-lg border-l-4 border-[#2A3A5B]">
+                      {league.logo && <img src={league.logo} alt={league.name} className="w-6 h-6 object-contain" />}
+                      <h3 className="font-bold text-[#2A3A5B]">{league.name}</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2">Team</th>
+                            <th className="px-4 py-2 text-center">Form</th>
+                            <th className="px-4 py-2 text-center">GF</th>
+                            <th className="px-4 py-2 text-center">GA</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(teamsByLeague[league.id] || []).map((team, i) => (
+                            <tr key={i} className="bg-white border-b">
+                              <td className="px-4 py-2 font-medium text-gray-900 flex items-center gap-2">
+                                <TeamLogo team={team} />
+                                {team.name}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {team.last5Matches.map((res, j) => (
+                                    <span key={j} className={cn(
+                                      "w-4 h-4 rounded text-[10px] flex items-center justify-center text-white font-bold",
+                                      res === 'W' ? "bg-green-500" : res === 'D' ? "bg-gray-400" : "bg-red-500"
+                                    )}>
+                                      {res}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-center">{team.goalsScored}</td>
+                              <td className="px-4 py-2 text-center">{team.goalsConceded}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
           const firstLeague = leagueStates[0];
-          const displayedSlots = activeNav === 'LIVE' 
+          const displayedSlots = (activeNav === 'LIVE' || activeNav === 'VIP') 
             ? firstLeague.slots.filter(s => firstLeague.currentSlotTime && s.time.getTime() === firstLeague.currentSlotTime.getTime())
             : firstLeague.slots;
 
@@ -135,7 +263,19 @@ export default function App() {
             );
           }
 
-          return displayedSlots.map((slot) => (
+          return displayedSlots.map((slot) => {
+            // Filter leagues based on activeTab
+            let filteredLeagueStates = leagueStates;
+            if (activeTab === 'Popular') {
+              filteredLeagueStates = leagueStates.filter(l => ['l1', 'l2', 'l4'].includes(l.leagueId)); // Example popular leagues
+            } else if (activeTab === 'Favorites') {
+              filteredLeagueStates = leagueStates.filter(l => ['l1', 'l5'].includes(l.leagueId)); // Example favorites
+            } else if (activeTab === 'Leagues') {
+              // Just show all for now, could open a modal
+              filteredLeagueStates = leagueStates;
+            }
+
+            return (
             <div key={slot.time.toISOString()} className="mb-6">
               {slot.isNewCycle && (
                 <div className="px-4 py-2 bg-blue-600 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md">
@@ -184,6 +324,94 @@ export default function App() {
                 const leagueSlot = leagueState.slots.find(s => s.time.getTime() === slot.time.getTime());
                 if (!leagueSlot || leagueSlot.matches.length === 0) return null;
 
+                if (activeNav === 'VIP') {
+                  return (
+                    <div key={`vip-${leagueState.leagueId}-${slot.time.toISOString()}`} className="mb-6 mx-4 mt-4 bg-[#1A1B2E] rounded-xl overflow-hidden shadow-xl border border-gray-800">
+                      <div className="bg-gradient-to-r from-[#2A3A5B] to-[#1A1B2E] px-4 py-3 flex items-center justify-between border-b border-gray-700">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{leagueState.leagueLogo || '🏆'}</span>
+                          <span className="font-bold text-white">{leagueState.leagueName}</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-black/30 px-2 py-1 rounded text-[#FFC107] font-bold text-sm">
+                          ⏱️ {formatTime(slot.time)}
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-[#131420]">
+                        <div className="space-y-2 mb-5">
+                          {leagueSlot.matches.map((match) => (
+                            <div key={`vip-match-${match.id}`} className="flex items-center justify-between text-sm font-medium text-white bg-[#1A1B2E] p-3 rounded-lg border border-gray-800 shadow-sm">
+                              <div className="flex items-center gap-3 flex-1 justify-end">
+                                <span className="font-semibold tracking-wide">{match.homeTeam.name}</span>
+                                <TeamLogo team={match.homeTeam} />
+                              </div>
+                              <div className="px-4 text-[#FFC107] font-black flex flex-col items-center justify-center min-w-[60px]">
+                                {match.status !== 'NS' ? (
+                                  <>
+                                    <span className="text-xl leading-none tracking-wider">{match.homeScore} - {match.awayScore}</span>
+                                    <span className={cn(
+                                      "text-[9px] mt-1 px-1.5 py-0.5 rounded uppercase tracking-wider",
+                                      match.status === 'LIVE' ? "bg-red-500/20 text-red-500 animate-pulse" : "bg-gray-500/20 text-gray-400"
+                                    )}>{match.status}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-500 text-xs">VS</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 flex-1 justify-start">
+                                <TeamLogo team={match.awayTeam} />
+                                <span className="font-semibold tracking-wide">{match.awayTeam.name}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-[#1A1B2E] to-[#0B1B3D] rounded-xl p-5 border border-[#FFC107]/20 shadow-lg relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFC107]/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                          
+                          <div className="flex items-center gap-2 text-[#FFC107] font-black mb-4 uppercase tracking-widest text-sm border-b border-[#FFC107]/10 pb-3">
+                            <Diamond size={18} fill="currentColor" className="drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" /> VIP PICKS
+                          </div>
+                          
+                          {(() => {
+                            const bestMatch = [...leagueSlot.matches].sort((a, b) => {
+                              const pA = analyzeMatch(a);
+                              const pB = analyzeMatch(b);
+                              return pB.matchCible.confidence - pA.matchCible.confidence;
+                            })[0];
+                            const prediction = analyzeMatch(bestMatch);
+                            
+                            return (
+                              <div className="space-y-3 relative z-10">
+                                <div className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                  <span className="text-gray-400 font-medium">Best Match</span>
+                                  <span className="text-white font-bold tracking-wide">{bestMatch.homeTeam.name} vs {bestMatch.awayTeam.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                  <span className="text-gray-400 font-medium">Prediction</span>
+                                  <span className="text-[#FFC107] font-black text-base drop-shadow-md">{prediction.matchCible.bestPrediction} <span className="text-xs text-[#FFC107]/80 font-bold">({prediction.matchCible.confidence}%)</span></span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                  <span className="text-gray-400 font-medium">Over/Under</span>
+                                  <span className="text-white font-bold">{prediction.safeBets.over15 ? 'Over 1.5' : 'Under 4.5'}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                  <span className="text-gray-400 font-medium">BTTS</span>
+                                  <span className="text-white font-bold">{prediction.advanced.btts ? 'Yes' : 'No'}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm bg-black/20 p-2 rounded">
+                                  <span className="text-gray-400 font-medium">Exact Score</span>
+                                  <span className="text-[#00E676] font-black tracking-wider">{prediction.vip.exactScoreAlt}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={`${leagueState.leagueId}-${slot.time.toISOString()}`} className="mb-4">
                     <div className="bg-[#2A3A5B] text-blue-100 px-4 py-1.5 font-bold text-sm sticky top-14 z-10 flex items-center gap-2 border-b border-[#1A1B2E]/20">
@@ -202,10 +430,15 @@ export default function App() {
                           >
                             <div className="w-16 flex flex-col items-center justify-center">
                               <span className={cn(
-                                "text-xs font-bold px-2 py-0.5 rounded",
+                                "text-xs font-bold px-2 py-0.5 rounded text-center",
                                 match.status === 'LIVE' ? "bg-red-100 text-red-600 animate-pulse" :
                                 match.status === 'FT' ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"
                               )}>{match.status}</span>
+                              {match.status === 'LIVE' && match.liveEvent && (
+                                <span className="text-[9px] font-bold text-red-500 mt-1 animate-bounce">
+                                  {match.liveEvent}
+                                </span>
+                              )}
                             </div>
                             
                             <div className="flex-1 px-2">
@@ -223,6 +456,13 @@ export default function App() {
                                 </div>
                                 {match.status !== 'NS' && <span className="font-black text-lg">{match.awayScore}</span>}
                               </div>
+                              {match.isHotMatch && (
+                                <div className="mt-1">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">
+                                    {match.hotReason}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             
                             <div className="flex flex-col items-end gap-1 ml-2">
@@ -251,7 +491,7 @@ export default function App() {
 
                           {isExpanded && (
                             <div className="bg-gray-50 px-4 py-4 border-t border-gray-200 animate-in slide-in-from-top-2 duration-200">
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-2 gap-4 mb-4">
                                 {/* Pronostic Principal */}
                                 <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
                                   <div className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wider">Pronostic Principal</div>
@@ -297,6 +537,80 @@ export default function App() {
                                 </div>
                               </div>
 
+                              {/* Full Betting Markets */}
+                              {match.fullOdds && (
+                                <div className="space-y-4 mt-6 border-t border-gray-200 pt-4">
+                                  <h4 className="font-bold text-[#2A3A5B] flex items-center gap-2">
+                                    <BarChart2 size={16} /> FULL BETTING MARKETS
+                                  </h4>
+                                  
+                                  {/* Over/Under */}
+                                  <div className="bg-white rounded-lg border p-3">
+                                    <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Total Goals (Over/Under)</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {Object.entries(match.fullOdds.main.overUnder).map(([line, odds]) => (
+                                        <div key={line} className="flex justify-between text-sm border-b pb-1">
+                                          <span className="text-gray-600">O/U {line}</span>
+                                          <div className="flex gap-2">
+                                            <span className="font-bold text-green-600">{odds.over.toFixed(2)}</span>
+                                            <span className="font-bold text-red-600">{odds.under.toFixed(2)}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Double Chance & BTTS */}
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-white rounded-lg border p-3">
+                                      <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Double Chance</div>
+                                      <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-600">1X</span>
+                                        <span className="font-bold">{match.fullOdds.main.doubleChance['1X'].toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-600">12</span>
+                                        <span className="font-bold">{match.fullOdds.main.doubleChance['12'].toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">X2</span>
+                                        <span className="font-bold">{match.fullOdds.main.doubleChance['X2'].toFixed(2)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="bg-white rounded-lg border p-3">
+                                      <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Both Teams To Score</div>
+                                      <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-gray-600">Yes</span>
+                                        <span className="font-bold text-green-600">{match.fullOdds.goals.btts.yes.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">No</span>
+                                        <span className="font-bold text-red-600">{match.fullOdds.goals.btts.no.toFixed(2)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Half Time */}
+                                  <div className="bg-white rounded-lg border p-3">
+                                    <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time (1X2)</div>
+                                    <div className="flex justify-between text-sm">
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-gray-500 text-xs">1</span>
+                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].home.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-gray-500 text-xs">X</span>
+                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].draw.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-gray-500 text-xs">2</span>
+                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].away.toFixed(2)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="mt-4 pt-3 border-t border-gray-200">
                                 <div className="flex justify-between text-xs text-gray-500 font-medium">
                                   <span>Power: {prediction.powerScores.home.toFixed(1)} vs {prediction.powerScores.away.toFixed(1)}</span>
@@ -313,8 +627,9 @@ export default function App() {
                 );
               })}
             </div>
-          ));
-        })()}
+          );
+        });
+      })()}
       </div>
 
       {/* Bottom Navigation */}
