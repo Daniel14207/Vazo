@@ -7,12 +7,220 @@ import { useVirtualLeague } from './lib/virtualLeague';
 
 const TeamLogo = ({ team }: { team: { name: string, logo?: string } }) => {
   if (team.logo) {
-    return <img src={team.logo} alt={team.name} className="w-5 h-5 object-contain" referrerPolicy="no-referrer" />;
+    if (team.logo.startsWith('http')) {
+      return <img src={team.logo} alt={team.name} className="w-5 h-5 object-contain" referrerPolicy="no-referrer" />;
+    } else {
+      return <span className="text-lg leading-none">{team.logo}</span>;
+    }
   }
   const initials = team.name.substring(0, 2).toUpperCase();
   return (
     <div className="w-5 h-5 rounded-full bg-[#2A3A5B] text-white flex items-center justify-center text-[9px] font-bold shadow-sm">
       {initials}
+    </div>
+  );
+};
+
+const MatchRow: React.FC<{ match: any, isExpanded: boolean, onToggle: () => void }> = ({ match, isExpanded, onToggle }) => {
+  const prediction = analyzeMatch(match);
+  return (
+    <div className="border-b border-gray-200">
+      <div 
+        className="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={onToggle}
+      >
+        <div className="w-16 flex flex-col items-center justify-center">
+          <span className={cn(
+            "text-xs font-bold px-2 py-0.5 rounded text-center",
+            match.status === 'LIVE' ? "bg-red-100 text-red-600 animate-pulse" :
+            match.status === 'FT' ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"
+          )}>{match.status}</span>
+          {match.status === 'LIVE' && match.liveEvent && (
+            <span className="text-[9px] font-bold text-red-500 mt-1 animate-bounce">
+              {match.liveEvent}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex-1 px-2">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <TeamLogo team={match.homeTeam} />
+              <span className="text-sm font-bold text-gray-800">{match.homeTeam.name}</span>
+            </div>
+            {match.status !== 'NS' && <span className="font-black text-lg">{match.homeScore}</span>}
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <div className="flex items-center gap-2">
+              <TeamLogo team={match.awayTeam} />
+              <span className="text-sm font-bold text-gray-800">{match.awayTeam.name}</span>
+            </div>
+            {match.status !== 'NS' && <span className="font-black text-lg">{match.awayScore}</span>}
+          </div>
+          {match.isHotMatch && (
+            <div className="mt-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">
+                {match.hotReason}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex flex-col items-end gap-1 ml-2">
+          <div className="flex gap-1">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-gray-500 font-medium">1</span>
+              <span className={cn("px-2 py-1 text-xs border rounded font-bold", match.status === 'NS' && prediction.matchCible.bestPrediction === '1' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
+                {match.odds.home.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-gray-500 font-medium">X</span>
+              <span className={cn("px-2 py-1 text-xs border rounded font-bold", match.status === 'NS' && prediction.matchCible.bestPrediction === 'X' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
+                {match.odds.draw.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-gray-500 font-medium">2</span>
+              <span className={cn("px-2 py-1 text-xs border rounded font-bold", match.status === 'NS' && prediction.matchCible.bestPrediction === '2' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
+                {match.odds.away.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isExpanded && match.status === 'NS' && (
+        <div className="bg-gray-50 px-4 py-4 border-t border-gray-200 animate-in slide-in-from-top-2 duration-200">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Pronostic Principal */}
+            <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+              <div className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wider">Pronostic Principal</div>
+              <div className="font-bold text-lg text-black">{prediction.matchCible.bestPrediction}</div>
+              <div className="text-sm text-green-600 font-bold mt-1">Confiance: {prediction.matchCible.confidence}%</div>
+            </div>
+            
+            {/* Score Exact */}
+            <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+              <div className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wider">Score Exact</div>
+              <div className="font-bold text-lg text-black">{prediction.matchCible.exactScore}</div>
+            </div>
+
+            {/* Safe Bets */}
+            <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Safe Bets (Free)</div>
+              <div className="flex flex-wrap gap-2">
+                {prediction.safeBets.over15 && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Over 1.5</span>}
+                {prediction.safeBets.under45 && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Under 4.5</span>}
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">{prediction.safeBets.doubleChance}</span>
+              </div>
+            </div>
+
+            {/* VIP Insights */}
+            <div className="bg-[#1A1B2E] p-3 rounded-lg shadow-sm border border-[#FFC107]">
+              <div className="text-xs text-[#FFC107] mb-2 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Star size={12} fill="currentColor" /> VIP Insights
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Alt Score:</span>
+                  <span className="text-white font-bold">{prediction.vip.exactScoreAlt}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Combo:</span>
+                  <span className="text-white font-bold">{prediction.vip.comboBet}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">High Odds:</span>
+                  <span className="text-[#FFC107] font-bold">{prediction.vip.highOddsPrediction} (@{prediction.vip.highOddsValue})</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Betting Markets */}
+          {match.fullOdds && (
+            <div className="space-y-4 mt-6 border-t border-gray-200 pt-4">
+              <h4 className="font-bold text-[#2A3A5B] flex items-center gap-2">
+                <BarChart2 size={16} /> FULL BETTING MARKETS
+              </h4>
+              
+              {/* Over/Under */}
+              <div className="bg-white rounded-lg border p-3">
+                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Total Goals (Over/Under)</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(match.fullOdds.main.overUnder).map(([line, odds]: [string, any]) => (
+                    <div key={line} className="flex justify-between text-sm border-b pb-1">
+                      <span className="text-gray-600">O/U {line}</span>
+                      <div className="flex gap-2">
+                        <span className="font-bold text-green-600">{odds.over.toFixed(2)}</span>
+                        <span className="font-bold text-red-600">{odds.under.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Double Chance & BTTS */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Double Chance</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">1X</span>
+                    <span className="font-bold">{match.fullOdds.main.doubleChance['1X'].toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">12</span>
+                    <span className="font-bold">{match.fullOdds.main.doubleChance['12'].toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">X2</span>
+                    <span className="font-bold">{match.fullOdds.main.doubleChance['X2'].toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Both Teams To Score</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Yes</span>
+                    <span className="font-bold text-green-600">{match.fullOdds.goals.btts.yes.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">No</span>
+                    <span className="font-bold text-red-600">{match.fullOdds.goals.btts.no.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Half Time */}
+              <div className="bg-white rounded-lg border p-3">
+                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time (1X2)</div>
+                <div className="flex justify-between text-sm">
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-500 text-xs">1</span>
+                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].home.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-500 text-xs">X</span>
+                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].draw.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-gray-500 text-xs">2</span>
+                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].away.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <div className="flex justify-between text-xs text-gray-500 font-medium">
+              <span>Power: {prediction.powerScores.home.toFixed(1)} vs {prediction.powerScores.away.toFixed(1)}</span>
+              <span>xG: {prediction.expectedGoals.home.toFixed(2)} vs {prediction.expectedGoals.away.toFixed(2)}</span>
+              <span>Win %: {Math.round(prediction.winProbability.home * 100)}% / {Math.round(prediction.winProbability.draw * 100)}% / {Math.round(prediction.winProbability.away * 100)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -43,6 +251,59 @@ export default function App() {
     };
   }, [leagueStates]);
 
+  const multipleBets = useMemo(() => {
+    const betsByLeague: Record<string, any[]> = {};
+    
+    leagueStates.forEach(leagueState => {
+      const allMatches = leagueState.slots.flatMap(s => s.matches).filter(m => m.status === 'NS');
+      const analyzed = allMatches.map(m => ({ match: m, prediction: analyzeMatch(m) }));
+      
+      // Sort by confidence
+      analyzed.sort((a, b) => b.prediction.matchCible.confidence - a.prediction.matchCible.confidence);
+      
+      const targetCount = leagueState.leagueName === 'Africa Cup' ? 20 : 10;
+      
+      // Select top matches, ensuring we mix bet types
+      const selected = analyzed.slice(0, targetCount).map((item, index) => {
+        // Mix bet types based on index to ensure variety
+        let betType = '';
+        let selection = '';
+        let odds = 0;
+        
+        if (index % 3 === 0) {
+          betType = '1X2';
+          selection = item.prediction.matchCible.bestPrediction;
+          odds = selection === '1' ? item.match.odds.home : selection === 'X' ? item.match.odds.draw : item.match.odds.away;
+        } else if (index % 3 === 1 && item.match.fullOdds) {
+          betType = 'Over/Under';
+          selection = item.prediction.safeBets.over15 ? 'Over 1.5' : 'Under 4.5';
+          odds = item.prediction.safeBets.over15 ? item.match.fullOdds.main.overUnder['1.5'].over : item.match.fullOdds.main.overUnder['4.5'].under;
+        } else if (item.match.fullOdds) {
+          betType = 'Double Chance';
+          selection = item.prediction.safeBets.doubleChance;
+          odds = item.match.fullOdds.main.doubleChance[selection as '1X' | '12' | 'X2'] || 1.2;
+        } else {
+          betType = '1X2';
+          selection = item.prediction.matchCible.bestPrediction;
+          odds = selection === '1' ? item.match.odds.home : selection === 'X' ? item.match.odds.draw : item.match.odds.away;
+        }
+        
+        return {
+          ...item,
+          betType,
+          selection,
+          odds
+        };
+      });
+      
+      if (selected.length > 0) {
+        betsByLeague[leagueState.leagueName] = selected;
+      }
+    });
+    
+    return betsByLeague;
+  }, [leagueStates]);
+
   const today = new Date();
   const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
   
@@ -61,7 +322,7 @@ export default function App() {
   const tabs = ['All', 'Popular', 'Favorites', 'Leagues'];
   const navItems = [ 
     { id: 'TIPS', icon: <Flame size={20} />, label: 'TIPS' }, 
-    { id: 'FREE', icon: <Trophy size={20} />, label: 'FREE' }, 
+    { id: 'MULTIPLE', icon: <Trophy size={20} />, label: 'MULTIPLE' }, 
     { id: 'BEST', icon: <TrendingUp size={20} />, label: 'BEST' }, 
     { id: 'LIVE', icon: <PlayCircle size={20} />, label: 'LIVE' }, 
     { id: 'VIP', icon: <Diamond size={20} />, label: 'VIP' }, 
@@ -245,10 +506,90 @@ export default function App() {
             );
           }
 
+          if (activeNav === 'MULTIPLE') {
+            return (
+              <div className="p-4 bg-gray-50 min-h-full">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-black text-[#1A1B2E] flex items-center gap-2">
+                    <Trophy className="text-[#FFC107]" /> MULTIPLE BETS
+                  </h2>
+                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full border border-green-200">
+                    High Probability
+                  </span>
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-6 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                  These selections are algorithmically generated to balance risk and reward, prioritizing high-confidence predictions across different markets.
+                </p>
+
+                {Object.entries(multipleBets as Record<string, any[]>).map(([leagueName, bets]) => {
+                  const totalOdds = bets.reduce((acc: number, bet: any) => acc * bet.odds, 1);
+                  
+                  return (
+                    <div key={leagueName} className="mb-8 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                      <div className="bg-[#2A3A5B] text-white px-4 py-3 flex justify-between items-center">
+                        <h3 className="font-bold flex items-center gap-2">
+                          <span className="text-xl">{leagueStates.find(l => l.leagueName === leagueName)?.leagueLogo || '🏆'}</span>
+                          {leagueName}
+                        </h3>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs text-blue-200 uppercase tracking-wider font-bold">Total Odds</span>
+                          <span className="text-[#FFC107] font-black text-lg">@{totalOdds.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="divide-y divide-gray-100">
+                        {bets.map((bet, idx) => (
+                          <div key={idx} className="p-3 hover:bg-gray-50 transition-colors flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-bold text-gray-400 w-4">{idx + 1}.</span>
+                                <span className="text-sm font-bold text-gray-800">{bet.match.homeTeam.name} vs {bet.match.awayTeam.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 pl-6">
+                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{bet.betType}</span>
+                                <span className="text-xs font-bold text-[#2A3A5B]">{bet.selection}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end pl-4 border-l border-gray-100">
+                              <span className="text-xs text-green-600 font-bold mb-1">{bet.prediction.matchCible.confidence}% Conf.</span>
+                              <span className="font-black text-lg text-[#1A1B2E]">@{bet.odds.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-sm text-gray-600">
+                          <span className="font-bold text-gray-900">{bets.length}</span> Selections
+                        </div>
+                        <button className="bg-[#FFC107] hover:bg-[#ffb300] text-black font-bold py-2 px-6 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                          <ShoppingCart size={16} /> ADD TO SLIP
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {Object.keys(multipleBets).length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    <Trophy size={48} className="mx-auto mb-4 opacity-20" />
+                    <p>No matches available for multiple bets right now.</p>
+                    <p className="text-sm mt-2">Please wait for the next cycle.</p>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const firstLeague = leagueStates[0];
-          const displayedSlots = (activeNav === 'LIVE' || activeNav === 'VIP') 
+          const displayedSlots = activeNav === 'LIVE'
             ? firstLeague.slots.filter(s => firstLeague.currentSlotTime && s.time.getTime() === firstLeague.currentSlotTime.getTime())
-            : firstLeague.slots;
+            : activeNav === 'VIP'
+            ? firstLeague.slots.filter(s => s.status === 'OPEN').slice(0, 1)
+            : activeNav === 'RESULTS'
+            ? firstLeague.slots.filter(s => s.status === 'FINISHED')
+            : firstLeague.slots.filter(s => firstLeague.currentSlotTime ? s.time.getTime() >= firstLeague.currentSlotTime.getTime() : s.status === 'OPEN');
 
           if (firstLeague.isBreak) {
             return (
@@ -263,13 +604,59 @@ export default function App() {
             );
           }
 
+          if (activeNav === 'TIPS') {
+            let filteredLeagueStates = leagueStates;
+            if (activeTab === 'Popular') {
+              filteredLeagueStates = leagueStates.filter(l => ['eng', 'ucl', 'spa'].includes(l.leagueId));
+            } else if (activeTab === 'Favorites') {
+              filteredLeagueStates = leagueStates.filter(l => ['eng', 'afr'].includes(l.leagueId));
+            }
+
+            return filteredLeagueStates.map((leagueState) => (
+              <div key={leagueState.leagueId} className="mb-6">
+                <div className="bg-[#2A3A5B] text-blue-100 px-4 py-2 font-bold text-lg sticky top-0 z-20 flex items-center gap-2 shadow-md">
+                  <span>{leagueState.leagueLogo || '🏆'}</span> {leagueState.leagueName}
+                </div>
+                {leagueState.slots.filter(s => leagueState.currentSlotTime ? s.time.getTime() >= leagueState.currentSlotTime.getTime() : s.status === 'OPEN').map(slot => {
+                  if (slot.matches.length === 0) return null;
+                  return (
+                    <div key={slot.time.toISOString()} className="mb-4">
+                      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 text-gray-800 sticky top-10 z-10 border-y border-gray-200 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <Clock size={16} className="text-gray-500" />
+                          <span className="font-bold tracking-wider">{formatTime(slot.time)}</span>
+                        </div>
+                        <span className={cn(
+                          "px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider",
+                          slot.status === 'OPEN' ? "bg-green-100 text-green-700" :
+                          slot.status === 'PLAYING' ? "bg-yellow-100 text-yellow-800 animate-pulse" :
+                          "bg-gray-200 text-gray-600"
+                        )}>
+                          {slot.status}
+                        </span>
+                      </div>
+                      {slot.matches.map(match => (
+                        <MatchRow 
+                          key={match.id} 
+                          match={match} 
+                          isExpanded={selectedMatch === match.id} 
+                          onToggle={() => setSelectedMatch(selectedMatch === match.id ? null : match.id)} 
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            ));
+          }
+
           return displayedSlots.map((slot) => {
             // Filter leagues based on activeTab
             let filteredLeagueStates = leagueStates;
             if (activeTab === 'Popular') {
-              filteredLeagueStates = leagueStates.filter(l => ['l1', 'l2', 'l4'].includes(l.leagueId)); // Example popular leagues
+              filteredLeagueStates = leagueStates.filter(l => ['eng', 'ucl', 'spa'].includes(l.leagueId)); // Example popular leagues
             } else if (activeTab === 'Favorites') {
-              filteredLeagueStates = leagueStates.filter(l => ['l1', 'l5'].includes(l.leagueId)); // Example favorites
+              filteredLeagueStates = leagueStates.filter(l => ['eng', 'afr'].includes(l.leagueId)); // Example favorites
             } else if (activeTab === 'Leagues') {
               // Just show all for now, could open a modal
               filteredLeagueStates = leagueStates;
@@ -320,7 +707,7 @@ export default function App() {
                 )}
               </div>
 
-              {leagueStates.map(leagueState => {
+              {filteredLeagueStates.map(leagueState => {
                 const leagueSlot = leagueState.slots.find(s => s.time.getTime() === slot.time.getTime());
                 if (!leagueSlot || leagueSlot.matches.length === 0) return null;
 
@@ -417,212 +804,14 @@ export default function App() {
                     <div className="bg-[#2A3A5B] text-blue-100 px-4 py-1.5 font-bold text-sm sticky top-14 z-10 flex items-center gap-2 border-b border-[#1A1B2E]/20">
                       <span>{leagueState.leagueLogo || '🏆'}</span> {leagueState.leagueName}
                     </div>
-                    
-                    {leagueSlot.matches.map((match) => {
-                      const prediction = analyzeMatch(match);
-                      const isExpanded = selectedMatch === match.id;
-                      
-                      return (
-                        <div key={match.id} className="border-b border-gray-200">
-                          <div 
-                            className="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                            onClick={() => setSelectedMatch(isExpanded ? null : match.id)}
-                          >
-                            <div className="w-16 flex flex-col items-center justify-center">
-                              <span className={cn(
-                                "text-xs font-bold px-2 py-0.5 rounded text-center",
-                                match.status === 'LIVE' ? "bg-red-100 text-red-600 animate-pulse" :
-                                match.status === 'FT' ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"
-                              )}>{match.status}</span>
-                              {match.status === 'LIVE' && match.liveEvent && (
-                                <span className="text-[9px] font-bold text-red-500 mt-1 animate-bounce">
-                                  {match.liveEvent}
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="flex-1 px-2">
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <TeamLogo team={match.homeTeam} />
-                                  <span className="text-sm font-bold text-gray-800">{match.homeTeam.name}</span>
-                                </div>
-                                {match.status !== 'NS' && <span className="font-black text-lg">{match.homeScore}</span>}
-                              </div>
-                              <div className="flex justify-between items-center mt-1">
-                                <div className="flex items-center gap-2">
-                                  <TeamLogo team={match.awayTeam} />
-                                  <span className="text-sm font-bold text-gray-800">{match.awayTeam.name}</span>
-                                </div>
-                                {match.status !== 'NS' && <span className="font-black text-lg">{match.awayScore}</span>}
-                              </div>
-                              {match.isHotMatch && (
-                                <div className="mt-1">
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">
-                                    {match.hotReason}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="flex flex-col items-end gap-1 ml-2">
-                              <div className="flex gap-1">
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[10px] text-gray-500 font-medium">1</span>
-                                  <span className={cn("px-2 py-1 text-xs border rounded font-bold", prediction.matchCible.bestPrediction === '1' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
-                                    {match.odds.home.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[10px] text-gray-500 font-medium">X</span>
-                                  <span className={cn("px-2 py-1 text-xs border rounded font-bold", prediction.matchCible.bestPrediction === 'X' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
-                                    {match.odds.draw.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[10px] text-gray-500 font-medium">2</span>
-                                  <span className={cn("px-2 py-1 text-xs border rounded font-bold", prediction.matchCible.bestPrediction === '2' ? "bg-green-50 border-green-500 text-green-700" : "border-gray-200 text-gray-700 bg-white")}>
-                                    {match.odds.away.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="bg-gray-50 px-4 py-4 border-t border-gray-200 animate-in slide-in-from-top-2 duration-200">
-                              <div className="grid grid-cols-2 gap-4 mb-4">
-                                {/* Pronostic Principal */}
-                                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
-                                  <div className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wider">Pronostic Principal</div>
-                                  <div className="font-bold text-lg text-black">{prediction.matchCible.bestPrediction}</div>
-                                  <div className="text-sm text-green-600 font-bold mt-1">Confiance: {prediction.matchCible.confidence}%</div>
-                                </div>
-                                
-                                {/* Score Exact */}
-                                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
-                                  <div className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wider">Score Exact</div>
-                                  <div className="font-bold text-lg text-black">{prediction.matchCible.exactScore}</div>
-                                </div>
-
-                                {/* Safe Bets */}
-                                <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
-                                  <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Safe Bets (Free)</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {prediction.safeBets.over15 && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Over 1.5</span>}
-                                    {prediction.safeBets.under45 && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Under 4.5</span>}
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">{prediction.safeBets.doubleChance}</span>
-                                  </div>
-                                </div>
-
-                                {/* VIP Insights */}
-                                <div className="bg-[#1A1B2E] p-3 rounded-lg shadow-sm border border-[#FFC107]">
-                                  <div className="text-xs text-[#FFC107] mb-2 font-bold uppercase tracking-wider flex items-center gap-1">
-                                    <Star size={12} fill="currentColor" /> VIP Insights
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-400">Alt Score:</span>
-                                      <span className="text-white font-bold">{prediction.vip.exactScoreAlt}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-400">Combo:</span>
-                                      <span className="text-white font-bold">{prediction.vip.comboBet}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-400">High Odds:</span>
-                                      <span className="text-[#FFC107] font-bold">{prediction.vip.highOddsPrediction} (@{prediction.vip.highOddsValue})</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Full Betting Markets */}
-                              {match.fullOdds && (
-                                <div className="space-y-4 mt-6 border-t border-gray-200 pt-4">
-                                  <h4 className="font-bold text-[#2A3A5B] flex items-center gap-2">
-                                    <BarChart2 size={16} /> FULL BETTING MARKETS
-                                  </h4>
-                                  
-                                  {/* Over/Under */}
-                                  <div className="bg-white rounded-lg border p-3">
-                                    <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Total Goals (Over/Under)</div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {Object.entries(match.fullOdds.main.overUnder).map(([line, odds]) => (
-                                        <div key={line} className="flex justify-between text-sm border-b pb-1">
-                                          <span className="text-gray-600">O/U {line}</span>
-                                          <div className="flex gap-2">
-                                            <span className="font-bold text-green-600">{odds.over.toFixed(2)}</span>
-                                            <span className="font-bold text-red-600">{odds.under.toFixed(2)}</span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Double Chance & BTTS */}
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-white rounded-lg border p-3">
-                                      <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Double Chance</div>
-                                      <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-gray-600">1X</span>
-                                        <span className="font-bold">{match.fullOdds.main.doubleChance['1X'].toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-gray-600">12</span>
-                                        <span className="font-bold">{match.fullOdds.main.doubleChance['12'].toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">X2</span>
-                                        <span className="font-bold">{match.fullOdds.main.doubleChance['X2'].toFixed(2)}</span>
-                                      </div>
-                                    </div>
-                                    <div className="bg-white rounded-lg border p-3">
-                                      <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Both Teams To Score</div>
-                                      <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-gray-600">Yes</span>
-                                        <span className="font-bold text-green-600">{match.fullOdds.goals.btts.yes.toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">No</span>
-                                        <span className="font-bold text-red-600">{match.fullOdds.goals.btts.no.toFixed(2)}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Half Time */}
-                                  <div className="bg-white rounded-lg border p-3">
-                                    <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time (1X2)</div>
-                                    <div className="flex justify-between text-sm">
-                                      <div className="flex flex-col items-center">
-                                        <span className="text-gray-500 text-xs">1</span>
-                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].home.toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex flex-col items-center">
-                                        <span className="text-gray-500 text-xs">X</span>
-                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].draw.toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex flex-col items-center">
-                                        <span className="text-gray-500 text-xs">2</span>
-                                        <span className="font-bold">{match.fullOdds.halfTime['1X2'].away.toFixed(2)}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="mt-4 pt-3 border-t border-gray-200">
-                                <div className="flex justify-between text-xs text-gray-500 font-medium">
-                                  <span>Power: {prediction.powerScores.home.toFixed(1)} vs {prediction.powerScores.away.toFixed(1)}</span>
-                                  <span>xG: {prediction.expectedGoals.home.toFixed(2)} vs {prediction.expectedGoals.away.toFixed(2)}</span>
-                                  <span>Win %: {Math.round(prediction.winProbability.home * 100)}% / {Math.round(prediction.winProbability.draw * 100)}% / {Math.round(prediction.winProbability.away * 100)}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {leagueSlot.matches.map((match) => (
+                      <MatchRow 
+                        key={match.id} 
+                        match={match} 
+                        isExpanded={selectedMatch === match.id} 
+                        onToggle={() => setSelectedMatch(selectedMatch === match.id ? null : match.id)} 
+                      />
+                    ))}
                   </div>
                 );
               })}

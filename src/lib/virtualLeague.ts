@@ -62,16 +62,19 @@ export function useVirtualLeague(): LeagueState[] {
 
       const generatedSlots: TimeSlot[] = [];
       
-      for (let i = 0; i <= 3; i++) {
+      for (let i = -1; i <= 2; i++) {
         let targetCycleIndex = cycleIndex;
         let targetSlotIndex = currentSlotIndex + i;
         
         if (isBreak) {
-          targetSlotIndex = i;
-          targetCycleIndex = cycleIndex + 1;
+          targetSlotIndex = i >= 0 ? i : SLOTS_PER_CYCLE - 1;
+          targetCycleIndex = i >= 0 ? cycleIndex + 1 : cycleIndex;
         } else if (targetSlotIndex >= SLOTS_PER_CYCLE) {
           targetSlotIndex = targetSlotIndex - SLOTS_PER_CYCLE;
           targetCycleIndex = cycleIndex + 1;
+        } else if (targetSlotIndex < 0) {
+          targetSlotIndex = targetSlotIndex + SLOTS_PER_CYCLE;
+          targetCycleIndex = cycleIndex - 1;
         }
 
         const slotTimeMs = targetCycleIndex * CYCLE_DURATION + targetSlotIndex * SLOT_DURATION;
@@ -79,7 +82,7 @@ export function useVirtualLeague(): LeagueState[] {
         
         generatedSlots.push({
           time: slotTime,
-          matches: generateMatchesForLeagueSlot(league.id, slotTime, 10),
+          matches: generateMatchesForLeagueSlot(league.id, slotTime, 12),
           status: 'OPEN',
           isNewCycle: targetSlotIndex === 0
         });
