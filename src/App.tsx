@@ -1,9 +1,17 @@
-import React, { useState, useMemo } from 'react';
-import { Menu, ShoppingCart, Star, ChevronRight, Clock, Flame, Trophy, TrendingUp, PlayCircle, Diamond, ArrowRightLeft, MoreHorizontal, CheckCircle, BarChart2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Menu, ShoppingCart, Star, ChevronRight, Clock, Flame, Trophy, TrendingUp, PlayCircle, Diamond, ArrowRightLeft, MoreHorizontal, CheckCircle, BarChart2, Lock, User, Copy, LogOut } from 'lucide-react';
 import { analyzeMatch } from './lib/predictionEngine';
 import { cn } from './lib/utils';
 import { leagues, teamsByLeague } from './lib/mockData';
 import { useVirtualLeague } from './lib/virtualLeague';
+import { Auth } from './components/Auth';
+import { Admin } from './components/Admin';
+import { Intro } from './components/Intro';
+import { Conditions } from './components/Conditions';
+import { HomeMenu } from './components/HomeMenu';
+import { AviatorStudio } from './components/AviatorStudio';
+import { NotificationContainer, NotificationType } from './components/Notification';
+import { fetchApi } from './lib/api';
 
 const TeamLogo = ({ team }: { team: { name: string, logo?: string } }) => {
   if (team.logo) {
@@ -226,11 +234,120 @@ const MatchRow: React.FC<{ match: any, isExpanded: boolean, onToggle: () => void
 };
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
+  const [showConditions, setShowConditions] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
-  const [activeNav, setActiveNav] = useState('TIPS');
+  const [activeNav, setActiveNav] = useState('HOME');
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [selectedDateIndex, setSelectedDateIndex] = useState(1); // Default to today (index 1)
+  const [notifications, setNotifications] = useState<{id: string, message: string, type: NotificationType, duration?: number}[]>([]);
+
+  const addNotification = (message: string, type: NotificationType, duration = 5000) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setNotifications(prev => [...prev, { id, message, type, duration }]);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentRef, setPaymentRef] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('10000');
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [secretCode, setSecretCode] = useState('');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
+
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (user && user.status === 'ACTIVE') {
+      const expireDate = new Date(user.expire_date);
+      const now = new Date();
+      if (expireDate > now) {
+        const diffTime = expireDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        if (diffDays <= 3) {
+          addNotification(`Votre abonnement VIP expire dans ${diffDays} jour(s).`, 'warning', 10000);
+        }
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          // Check if admin token
+          const decoded = JSON.parse(atob(token.split('.')[1]));
+          if (decoded.admin) {
+            setIsAdmin(true);
+          } else {
+            const data = await fetchApi('/auth/me');
+            setUser(data.user);
+          }
+        } catch (err) {
+          localStorage.removeItem('token');
+        }
+      }
+      setIsCheckingAuth(false);
+    };
+    checkAuth();
+  }, []);
+
+  const handleAdminLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminCode === '@9729') {
+      handleAdminLogin(adminCode);
+      setShowAdminLogin(false);
+      setAdminCode('');
+    } else {
+      addNotification('Code invalide', 'warning');
+    }
+  };
+
+  const handleAdminLogin = async (code: string) => {
+    try {
+      const data = await fetchApi('/admin/login', {
+        method: 'POST',
+        body: JSON.stringify({ code })
+      });
+      localStorage.setItem('token', data.token);
+      setIsAdmin(true);
+    } catch (err) {
+      addNotification('Code invalide', 'warning');
+    }
+  };
+
+  const submitPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentRef) return;
+    try {
+      await fetchApi('/payments', {
+        method: 'POST',
+        body: JSON.stringify({ reference: paymentRef, amount: parseInt(paymentAmount) })
+      });
+      setPaymentStatus('Paiement envoyé ! En attente de validation.');
+      setPaymentRef('');
+      setTimeout(() => {
+        setShowPayment(false);
+        setPaymentStatus('');
+      }, 3000);
+    } catch (err) {
+      addNotification('Erreur lors de l\'envoi du paiement', 'warning');
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setIsAdmin(false);
+  };
 
   const leagueStates = useVirtualLeague();
 
@@ -320,7 +437,7 @@ export default function App() {
   });
 
   const tabs = ['All', 'Popular', 'Favorites', 'Leagues'];
-  const navItems = [ 
+  const allNavItems = [ 
     { id: 'TIPS', icon: <Flame size={20} />, label: 'TIPS' }, 
     { id: 'MULTIPLE', icon: <Trophy size={20} />, label: 'MULTIPLE' }, 
     { id: 'BEST', icon: <TrendingUp size={20} />, label: 'BEST' }, 
@@ -330,94 +447,273 @@ export default function App() {
     { id: 'STATS', icon: <BarChart2 size={20} />, label: 'STATS' } 
   ];
 
+  const isVipActive = user?.status === 'ACTIVE';
+  const navItems = isVipActive 
+    ? allNavItems 
+    : allNavItems.filter(item => ['RESULTS', 'STATS'].includes(item.id));
+
+  // Ensure activeNav is valid
+  useEffect(() => {
+    if (!isVipActive && !['RESULTS', 'STATS', 'HOME', 'AVIATOR'].includes(activeNav)) {
+      setActiveNav('HOME');
+    }
+  }, [isVipActive, activeNav]);
+
+  const lastNotifiedSlot = React.useRef<number | null>(null);
+
+  useEffect(() => {
+    if (activeNav === 'TIPS' && isVipActive) {
+      const currentSlotTimeMs = leagueStates[0]?.currentSlotTime?.getTime();
+      if (currentSlotTimeMs && currentSlotTimeMs !== lastNotifiedSlot.current) {
+        const hasHotMatch = leagueStates.some(league => 
+          league.slots.some(slot => 
+            slot.time.getTime() === currentSlotTimeMs && slot.matches.some(m => m.isHotMatch)
+          )
+        );
+        if (hasHotMatch) {
+          addNotification('🔥 HOT MATCH détecté dans le cycle actuel !', 'info', 5000);
+          lastNotifiedSlot.current = currentSlotTimeMs;
+        }
+      }
+    }
+  }, [activeNav, isVipActive, leagueStates[0]?.currentSlotTime]);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  if (showIntro) {
+    return <Intro onComplete={() => {
+      setShowIntro(false);
+      if (!localStorage.getItem('conditionsAccepted')) {
+        setShowConditions(true);
+      }
+    }} />;
+  }
+
+  if (showConditions) {
+    return <Conditions onAccept={() => {
+      localStorage.setItem('conditionsAccepted', 'true');
+      setShowConditions(false);
+    }} />;
+  }
+
+  if (isCheckingAuth) {
+    return <div className="min-h-screen bg-[#1A1B2E] flex items-center justify-center text-white">Chargement...</div>;
+  }
+
+  if (isAdmin) {
+    return <Admin onLogout={logout} />;
+  }
+
+  if (!user) {
+    return <Auth onLogin={setUser} onAdminLogin={handleAdminLogin} />;
+  }
+
   return (
     <div className="flex flex-col h-screen bg-[#1A1B2E] text-white font-sans overflow-hidden">
+      <NotificationContainer notifications={notifications} onClose={removeNotification} />
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-[#1A1B2E]">
-        <button className="p-2 bg-[#FFC107] rounded-md text-black">
-          <Menu size={24} />
-        </button>
-        <h1 className="text-xl font-semibold text-blue-200">Betting Tips</h1>
-        <div className="relative">
-          <button className="p-2 bg-[#FFC107] rounded-md text-black">
-            <ShoppingCart size={24} />
+      <header className="flex items-center justify-between px-4 py-3 bg-[#1A1B2E] border-b border-gray-800">
+        <div className="flex items-center gap-2">
+          <div className="relative group">
+            <button className="p-2 bg-[#2A3A5B] rounded-xl text-white hover:bg-[#FFC107] hover:text-black transition-colors">
+              <Menu size={24} />
+            </button>
+            <div className="absolute top-full left-0 mt-2 w-48 bg-[#1A1B2E] border border-gray-800 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+              <button onClick={() => setActiveNav('TIPS')} className="w-full text-left px-4 py-3 text-sm font-bold text-white hover:bg-[#2A3A5B] flex items-center gap-2">
+                <Trophy size={16} className="text-[#45F3FF]" /> VIRTUEL FOOT
+              </button>
+              <button onClick={() => setActiveNav('AVIATOR')} className="w-full text-left px-4 py-3 text-sm font-bold text-white hover:bg-[#2A3A5B] flex items-center gap-2">
+                <PlayCircle size={16} className="text-[#FF003C]" /> AVIATOR
+              </button>
+              <a href="tel:0342594678" className="w-full text-left px-4 py-3 text-sm font-bold text-white hover:bg-[#2A3A5B] flex items-center gap-2">
+                <User size={16} className="text-[#FFC107]" /> CONTACT ADMIN
+              </a>
+              <button 
+                onDoubleClick={() => setShowAdminLogin(true)}
+                className="w-full text-left px-4 py-3 text-xs font-mono text-gray-600 hover:bg-[#2A3A5B] hover:text-gray-400"
+              >
+                ADMIN ACCESS
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center">
+          <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#45F3FF] to-[#FF003C] tracking-tight">VITAL PRONOSTIC</h1>
+          <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Betting Tips</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowPayment(true)} className="p-2 bg-[#FFC107] rounded-xl text-black hover:bg-[#ffb300] transition-colors relative">
+            <ShoppingCart size={20} />
+            {user.token_balance > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center text-white">
+                {user.token_balance}
+              </span>
+            )}
           </button>
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-            1
-          </span>
+          <button onClick={logout} className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-colors">
+            <LogOut size={20} />
+          </button>
         </div>
       </header>
 
-      {/* Date Selector */}
-      <div className="bg-[#1A1B2E] pt-2 pb-1">
-        <div className="text-center text-gray-400 text-sm font-semibold mb-2 tracking-widest">
-          {currentMonth}
+      {/* VIP Status Banner */}
+      <div className={cn("px-4 py-2 text-xs font-bold shadow-md z-10 flex justify-between items-center", isVipActive ? "bg-gradient-to-r from-green-600 to-green-500 text-white" : "bg-gradient-to-r from-red-600 to-red-500 text-white")}>
+        <div className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg">
+          <span className="font-mono">ID: {user.id}</span>
         </div>
-        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar pb-2">
-          {dates.map((d, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setSelectedDateIndex(i);
-                if (i === 0) setActiveNav('RESULTS');
-              }}
-              className={cn(
-                "flex flex-col items-center justify-center min-w-[60px] py-2 rounded-lg text-sm transition-all",
-                selectedDateIndex === i ? "bg-[#FFC107] text-black shadow-md shadow-[#FFC107]/20" : "bg-[#2A2B4A] text-gray-400 hover:bg-[#2A2B4A]/80",
-                d.isToday && selectedDateIndex !== i && "border border-[#FFC107]/50"
-              )}
-            >
-              <span className="font-medium text-xs uppercase">{d.day}</span>
-              <span className={cn("text-lg font-bold", selectedDateIndex === i ? "text-black" : "text-white")}>{d.date}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 px-4 py-3 bg-[#1A1B2E]">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "flex-1 py-1.5 rounded-full text-sm font-medium border",
-              activeTab === tab
-                ? "bg-[#FFC107] text-black border-[#FFC107]"
-                : "bg-transparent text-gray-300 border-gray-600"
-            )}
-          >
-            {tab}
+        
+        {isVipActive ? (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <CheckCircle size={14} />
+              <span>Tokens: ACTIVE</span>
+            </div>
+            <span className="bg-black/20 px-2 py-0.5 rounded-full text-[10px]">
+              Expire: {new Date(user.expire_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+        ) : (
+          <button onClick={() => setShowPayment(true)} className="flex items-center gap-2 bg-white text-red-600 px-3 py-1 rounded-full hover:bg-gray-100 transition-colors">
+            <Lock size={14} />
+            <span>Activez votre token pour accéder aux signaux</span>
           </button>
-        ))}
-        <button className="p-1.5 rounded-full border border-gray-600 text-gray-300">
-          <Menu size={20} />
-        </button>
+        )}
       </div>
 
-      {/* Match List */}
-      <div className="flex-1 overflow-y-auto bg-white text-black">
-        {(() => {
-          if (leagueStates.length === 0) return null;
-          
-          if (activeNav === 'RESULTS' || selectedDateIndex === 0) {
-            return (
-              <div className="p-4">
-                <h2 className="text-xl font-bold text-[#1A1B2E] mb-4 flex items-center gap-2">
-                  <CheckCircle className="text-green-500" /> RESULTS - {dates[0].day} {dates[0].date}
-                </h2>
-                {leagueStates.map(league => (
-                  <div key={league.leagueId} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3 bg-gray-100 p-2 rounded-lg border-l-4 border-[#2A3A5B]">
-                      {league.leagueLogo && <img src={league.leagueLogo} alt={league.leagueName} className="w-6 h-6 object-contain" />}
-                      <h3 className="font-bold text-[#2A3A5B]">{league.leagueName}</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {/* Mock results based on the league's teams */}
+      {/* Payment Modal */}
+      {showPayment && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1A1B2E] rounded-2xl w-full max-w-md overflow-hidden shadow-[0_0_30px_rgba(69,243,255,0.2)] border border-gray-800">
+            <div className="bg-gradient-to-r from-[#2A3A5B] to-[#1A1B2E] p-4 text-center relative border-b border-gray-800">
+              <h2 className="text-xl font-black text-white">ACTIVER LE VIP</h2>
+              <button onClick={() => setShowPayment(false)} className="absolute top-4 right-4 text-white/50 hover:text-white">✕</button>
+            </div>
+            <div className="p-6 text-gray-300">
+              <div className="bg-[#0B0C10] border border-[#45F3FF]/30 rounded-xl p-4 mb-6 text-center">
+                <p className="text-sm text-gray-400 font-bold mb-1">Envoyez le paiement au numéro :</p>
+                <a href="tel:0342594678" className="text-3xl font-black text-[#45F3FF] tracking-wider hover:text-white transition-colors block my-2">034 25 946 78</a>
+                <p className="text-xs text-gray-500 mt-1">(Telma / Airtel)</p>
+              </div>
+
+              <form onSubmit={submitPayment} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Montant envoyé</label>
+                  <select 
+                    value={paymentAmount} 
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[#0B0C10] text-white focus:border-[#45F3FF] focus:ring-1 focus:ring-[#45F3FF] outline-none font-bold appearance-none"
+                  >
+                    <option value="5000">5 000 Ar (Durée personnalisée)</option>
+                    <option value="10000">10 000 Ar (7 Jours)</option>
+                    <option value="40000">40 000 Ar (30 Jours)</option>
+                    <option value="400000">400 000 Ar (1 An)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Référence de transaction</label>
+                  <input
+                    type="text"
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-[#0B0C10] text-white focus:border-[#45F3FF] focus:ring-1 focus:ring-[#45F3FF] outline-none font-medium placeholder-gray-600"
+                    placeholder="Ex: 123456789"
+                    required
+                  />
+                </div>
+                
+                {paymentStatus && (
+                  <div className="p-4 bg-green-500/10 text-green-400 text-sm font-bold rounded-xl text-center border border-green-500/30">
+                    {paymentStatus}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#FFC107] hover:bg-[#ffb300] text-[#1A1B2E] font-black py-4 rounded-xl shadow-[0_0_15px_rgba(255,193,7,0.3)] transition-all mt-6"
+                >
+                  CONFIRMER LE PAIEMENT
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      {activeNav === 'HOME' ? (
+        <HomeMenu onSelect={(nav) => setActiveNav(nav === 'VIRTUEL_FOOT' ? 'TIPS' : nav)} />
+      ) : activeNav === 'AVIATOR' ? (
+        <AviatorStudio isVipActive={isVipActive} onShowPayment={() => setShowPayment(true)} />
+      ) : (
+        <>
+          {/* Date Selector */}
+          <div className="bg-[#1A1B2E] pt-2 pb-1">
+            <div className="text-center text-gray-400 text-sm font-semibold mb-2 tracking-widest">
+              {currentMonth}
+            </div>
+            <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar pb-2">
+              {dates.map((d, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSelectedDateIndex(i);
+                    if (i === 0) setActiveNav('RESULTS');
+                  }}
+                  className={cn(
+                    "flex flex-col items-center justify-center min-w-[60px] py-2 rounded-lg text-sm transition-all",
+                    selectedDateIndex === i ? "bg-[#FFC107] text-black shadow-md shadow-[#FFC107]/20" : "bg-[#2A2B4A] text-gray-400 hover:bg-[#2A2B4A]/80",
+                    d.isToday && selectedDateIndex !== i && "border border-[#FFC107]/50"
+                  )}
+                >
+                  <span className="font-medium text-xs uppercase">{d.day}</span>
+                  <span className={cn("text-lg font-bold", selectedDateIndex === i ? "text-black" : "text-white")}>{d.date}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="flex gap-2 px-4 py-3 bg-[#1A1B2E]">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "flex-1 py-1.5 rounded-full text-sm font-medium border",
+                  activeTab === tab
+                    ? "bg-[#FFC107] text-black border-[#FFC107]"
+                    : "bg-transparent text-gray-300 border-gray-600"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+            <button className="p-1.5 rounded-full border border-gray-600 text-gray-300">
+              <Menu size={20} />
+            </button>
+          </div>
+
+          {/* Match List */}
+          <div className="flex-1 overflow-y-auto bg-white text-black">
+            {(() => {
+              if (leagueStates.length === 0) return null;
+              
+              if (activeNav === 'RESULTS' || selectedDateIndex === 0) {
+                return (
+                  <div className="p-4">
+                    <h2 className="text-xl font-bold text-[#1A1B2E] mb-4 flex items-center gap-2">
+                      <CheckCircle className="text-green-500" /> RESULTS - {dates[0].day} {dates[0].date}
+                    </h2>
+                    {leagueStates.map(league => (
+                      <div key={league.leagueId} className="mb-6">
+                        <div className="flex items-center gap-2 mb-3 bg-gray-100 p-2 rounded-lg border-l-4 border-[#2A3A5B]">
+                          {league.leagueLogo && <img src={league.leagueLogo} alt={league.leagueName} className="w-6 h-6 object-contain" />}
+                          <h3 className="font-bold text-[#2A3A5B]">{league.leagueName}</h3>
+                        </div>
+                        <div className="space-y-2">
+                          {/* Mock results based on the league's teams */}
                       {(() => {
                         const teams = teamsByLeague[league.leagueId] || [];
                         const results = [];
@@ -617,6 +913,15 @@ export default function App() {
                 <div className="bg-[#2A3A5B] text-blue-100 px-4 py-2 font-bold text-lg sticky top-0 z-20 flex items-center gap-2 shadow-md">
                   <span>{leagueState.leagueLogo || '🏆'}</span> {leagueState.leagueName}
                 </div>
+                {leagueState.isBreak && (
+                  <div className="p-8 text-center bg-gray-50 border-y border-gray-200">
+                    <div className="text-4xl mb-3">☕</div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">Pause Technique</h3>
+                    <p className="text-gray-500 text-sm">
+                      Prochain cycle dans {Math.ceil(leagueState.breakTimeRemaining / 60000)} minutes
+                    </p>
+                  </div>
+                )}
                 {leagueState.slots.filter(s => leagueState.currentSlotTime ? s.time.getTime() >= leagueState.currentSlotTime.getTime() : s.status === 'OPEN').map(slot => {
                   if (slot.matches.length === 0) return null;
                   return (
@@ -820,26 +1125,30 @@ export default function App() {
         });
       })()}
       </div>
+      </>
+      )}
 
       {/* Bottom Navigation */}
-      <div className="flex justify-between items-center px-2 py-2 bg-[#1A1B2E] border-t border-gray-800">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => {
-              setActiveNav(item.id);
-              if (item.id === 'MORE') setShowMoreModal(true);
-            }}
-            className={cn(
-              "flex flex-col items-center justify-center w-12 h-12 rounded-lg",
-              activeNav === item.id ? "text-[#FFC107]" : "text-gray-400"
-            )}
-          >
-            <span className="text-xl mb-1">{item.icon}</span>
-            <span className="text-[9px] font-medium">{item.label}</span>
-          </button>
-        ))}
-      </div>
+      {activeNav !== 'AVIATOR' && activeNav !== 'HOME' && (
+        <div className="flex justify-between items-center px-2 py-2 bg-[#1A1B2E] border-t border-gray-800">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveNav(item.id);
+                if (item.id === 'MORE') setShowMoreModal(true);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center w-12 h-12 rounded-lg",
+                activeNav === item.id ? "text-[#FFC107]" : "text-gray-400"
+              )}
+            >
+              <span className="text-xl mb-1">{item.icon}</span>
+              <span className="text-[9px] font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* More Modal */}
       {showMoreModal && (
@@ -1017,6 +1326,47 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Login Modal */}
+      {showAdminLogin && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1A1B2E] border border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
+                <Lock size={20} className="text-[#FF003C]" /> Accès Administrateur
+              </h3>
+              <form onSubmit={handleAdminLoginSubmit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-gray-400 mb-1">Code Secret</label>
+                  <input 
+                    type="password" 
+                    value={adminCode} 
+                    onChange={e => setAdminCode(e.target.value)}
+                    className="w-full bg-[#0F101A] border border-gray-800 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-[#45F3FF]"
+                    placeholder="••••"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => { setShowAdminLogin(false); setAdminCode(''); }}
+                    className="flex-1 py-3 bg-[#2A3A5B] hover:bg-[#3A4A6B] text-white rounded-xl font-bold transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3 bg-[#FF003C] hover:bg-red-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#FF003C]/30"
+                  >
+                    Connexion
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
