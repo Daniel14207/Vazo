@@ -10,6 +10,7 @@ import { Intro } from './components/Intro';
 import { Conditions } from './components/Conditions';
 import { HomeMenu } from './components/HomeMenu';
 import { AviatorStudio } from './components/AviatorStudio';
+import { ManualAnalysis } from './components/ManualAnalysis';
 import { NotificationContainer, NotificationType } from './components/Notification';
 import { fetchApi } from './lib/api';
 
@@ -189,31 +190,168 @@ const MatchRow: React.FC<{ match: any, isExpanded: boolean, onToggle: () => void
                 <div className="bg-white rounded-lg border p-3">
                   <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Both Teams To Score</div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Yes</span>
+                    <span className="text-gray-600">Yes (GG)</span>
                     <span className="font-bold text-green-600">{match.fullOdds.goals.btts.yes.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">No</span>
+                    <span className="text-gray-600">No (NG)</span>
                     <span className="font-bold text-red-600">{match.fullOdds.goals.btts.no.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Half Time */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time (1X2)</div>
+                  <div className="flex justify-between text-sm">
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-500 text-xs">1</span>
+                      <span className="font-bold">{match.fullOdds.halfTime['1X2'].home.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-500 text-xs">X</span>
+                      <span className="font-bold">{match.fullOdds.halfTime['1X2'].draw.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-gray-500 text-xs">2</span>
+                      <span className="font-bold">{match.fullOdds.halfTime['1X2'].away.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">HT Double Chance</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">1X</span>
+                    <span className="font-bold">{match.fullOdds.halfTime.doubleChance['1X'].toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">12</span>
+                    <span className="font-bold">{match.fullOdds.halfTime.doubleChance['12'].toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">X2</span>
+                    <span className="font-bold">{match.fullOdds.halfTime.doubleChance['X2'].toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* HT/FT */}
               <div className="bg-white rounded-lg border p-3">
-                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time (1X2)</div>
-                <div className="flex justify-between text-sm">
-                  <div className="flex flex-col items-center">
-                    <span className="text-gray-500 text-xs">1</span>
-                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].home.toFixed(2)}</span>
+                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Half Time / Full Time</div>
+                <div className="grid grid-cols-3 gap-2 text-sm text-center">
+                  <div><span className="text-gray-500 text-xs block">1/1</span><span className="font-bold">{match.fullOdds.main.htft['1/1'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">1/X</span><span className="font-bold">{match.fullOdds.main.htft['1/X'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">1/2</span><span className="font-bold">{match.fullOdds.main.htft['1/2'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">X/1</span><span className="font-bold">{match.fullOdds.main.htft['X/1'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">X/X</span><span className="font-bold">{match.fullOdds.main.htft['X/X'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">X/2</span><span className="font-bold">{match.fullOdds.main.htft['X/2'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">2/1</span><span className="font-bold">{match.fullOdds.main.htft['2/1'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">2/X</span><span className="font-bold">{match.fullOdds.main.htft['2/X'].toFixed(2)}</span></div>
+                  <div><span className="text-gray-500 text-xs block">2/2</span><span className="font-bold">{match.fullOdds.main.htft['2/2'].toFixed(2)}</span></div>
+                </div>
+              </div>
+
+              {/* Correct Score */}
+              <div className="bg-white rounded-lg border p-3">
+                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Correct Score</div>
+                <div className="grid grid-cols-3 gap-2 text-sm text-center">
+                  {Object.entries(match.fullOdds.main.exactScore).map(([score, odds]: [string, any]) => (
+                    <div key={score}><span className="text-gray-500 text-xs block">{score}</span><span className="font-bold">{odds.toFixed(2)}</span></div>
+                  ))}
+                </div>
+              </div>
+
+              {/* HT Correct Score */}
+              <div className="bg-white rounded-lg border p-3">
+                <div className="text-xs font-bold text-gray-500 mb-2 uppercase">HT Correct Score</div>
+                <div className="grid grid-cols-4 gap-2 text-sm text-center">
+                  {Object.entries(match.fullOdds.halfTime.exactScore).map(([score, odds]: [string, any]) => (
+                    <div key={score}><span className="text-gray-500 text-xs block">{score}</span><span className="font-bold">{odds.toFixed(2)}</span></div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Team Totals */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Home Total Goals</div>
+                  {Object.entries(match.fullOdds.teamTotals.home).map(([line, odds]: [string, any]) => (
+                    <div key={line} className="flex justify-between text-sm border-b pb-1 mb-1 last:border-0 last:mb-0">
+                      <span className="text-gray-600">O/U {line}</span>
+                      <div className="flex gap-2">
+                        <span className="font-bold text-green-600">{odds.over.toFixed(2)}</span>
+                        <span className="font-bold text-red-600">{odds.under.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Away Total Goals</div>
+                  {Object.entries(match.fullOdds.teamTotals.away).map(([line, odds]: [string, any]) => (
+                    <div key={line} className="flex justify-between text-sm border-b pb-1 mb-1 last:border-0 last:mb-0">
+                      <span className="text-gray-600">O/U {line}</span>
+                      <div className="flex gap-2">
+                        <span className="font-bold text-green-600">{odds.over.toFixed(2)}</span>
+                        <span className="font-bold text-red-600">{odds.under.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Special Markets */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Odd / Even</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Odd (Impair)</span>
+                    <span className="font-bold">{match.fullOdds.special.oddEven.odd.toFixed(2)}</span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-gray-500 text-xs">X</span>
-                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].draw.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Even (Pair)</span>
+                    <span className="font-bold">{match.fullOdds.special.oddEven.even.toFixed(2)}</span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-gray-500 text-xs">2</span>
-                    <span className="font-bold">{match.fullOdds.halfTime['1X2'].away.toFixed(2)}</span>
+                </div>
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">First Team To Score</div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Home</span>
+                    <span className="font-bold">{match.fullOdds.goals.ftts.home.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Away</span>
+                    <span className="font-bold">{match.fullOdds.goals.ftts.away.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">None</span>
+                    <span className="font-bold">{match.fullOdds.goals.ftts.none.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi Goals & First Goal Minute */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">Multi Goals</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {Object.entries(match.fullOdds.special.multiGoals).map(([range, odds]: [string, any]) => (
+                      <div key={range} className="flex justify-between">
+                        <span className="text-gray-600">{range}</span>
+                        <span className="font-bold">{odds.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg border p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2 uppercase">First Goal Minute</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {Object.entries(match.fullOdds.special.firstGoalMinute).map(([range, odds]: [string, any]) => (
+                      <div key={range} className="flex justify-between">
+                        <span className="text-gray-600">{range}</span>
+                        <span className="font-bold">{odds.toFixed(2)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -454,7 +592,7 @@ export default function App() {
 
   // Ensure activeNav is valid
   useEffect(() => {
-    if (!isVipActive && !['RESULTS', 'STATS', 'HOME', 'AVIATOR'].includes(activeNav)) {
+    if (!isVipActive && !['RESULTS', 'STATS', 'HOME', 'AVIATOR', 'ANALYSE'].includes(activeNav)) {
       setActiveNav('HOME');
     }
   }, [isVipActive, activeNav]);
@@ -646,6 +784,8 @@ export default function App() {
         <HomeMenu onSelect={(nav) => setActiveNav(nav === 'VIRTUEL_FOOT' ? 'TIPS' : nav)} />
       ) : activeNav === 'AVIATOR' ? (
         <AviatorStudio isVipActive={isVipActive} onShowPayment={() => setShowPayment(true)} />
+      ) : activeNav === 'ANALYSE' ? (
+        <ManualAnalysis isVipActive={isVipActive} onShowPayment={() => setShowPayment(true)} />
       ) : (
         <>
           {/* Date Selector */}

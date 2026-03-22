@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, PlayCircle, ChevronRight } from 'lucide-react';
+import { Trophy, PlayCircle, ChevronRight, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export const HomeMenu = ({ onSelect }: { onSelect: (nav: string) => void }) => {
@@ -40,6 +40,26 @@ export const HomeMenu = ({ onSelect }: { onSelect: (nav: string) => void }) => {
           <h2 className="text-2xl font-black text-white tracking-wider mb-2">AVIATOR STUDIO</h2>
           <p className="text-gray-400 text-sm mb-6">Analyse en temps réel des multiplicateurs Aviator.</p>
           <div className="flex items-center gap-2 text-[#FF003C] font-bold text-sm">
+            ENTRER <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+      </motion.button>
+
+      <motion.button
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        onClick={() => onSelect('ANALYSE')}
+        className="w-full max-w-sm bg-gradient-to-br from-[#2A3A5B] to-[#1A1B2E] rounded-3xl p-8 shadow-[0_0_30px_rgba(255,193,7,0.1)] border border-[#FFC107]/20 hover:border-[#FFC107]/60 transition-all group relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#FFC107]/10 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:bg-[#FFC107]/20"></div>
+        <div className="flex flex-col items-center text-center relative z-10">
+          <div className="w-20 h-20 bg-[#0B0C10] rounded-full flex items-center justify-center mb-4 border border-[#FFC107]/30 shadow-[0_0_15px_rgba(255,193,7,0.2)]">
+            <Activity size={40} className="text-[#FFC107]" />
+          </div>
+          <h2 className="text-2xl font-black text-white tracking-wider mb-2">ANALYSE MANUELLE</h2>
+          <p className="text-gray-400 text-sm mb-6">Outil VIP pour analyser vos propres matchs.</p>
+          <div className="flex items-center gap-2 text-[#FFC107] font-bold text-sm">
             ENTRER <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </div>
         </div>

@@ -80,9 +80,11 @@ export function useVirtualLeague(): LeagueState[] {
         const slotTimeMs = targetCycleIndex * CYCLE_DURATION + targetSlotIndex * SLOT_DURATION;
         const slotTime = new Date(slotTimeMs);
         
+        const numMatches = league.id === 'caf' ? 20 : 10;
+        
         generatedSlots.push({
           time: slotTime,
-          matches: generateMatchesForLeagueSlot(league.id, slotTime, 12),
+          matches: generateMatchesForLeagueSlot(league.id, slotTime, numMatches),
           status: 'OPEN',
           isNewCycle: targetSlotIndex === 0
         });
