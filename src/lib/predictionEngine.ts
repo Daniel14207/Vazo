@@ -288,7 +288,13 @@ export function simulateScore(homeXG: number, awayXG: number, seedStr: string): 
   };
 }
 
+const predictionCache = new Map<string, PredictionResult>();
+
 export function analyzeMatch(match: Match): PredictionResult {
+  if (predictionCache.has(match.id)) {
+    return predictionCache.get(match.id)!;
+  }
+
   const home = match.homeTeam;
   const away = match.awayTeam;
 
@@ -378,7 +384,7 @@ export function analyzeMatch(match: Match): PredictionResult {
     riskLevel = 'HIGH RISK';
   }
 
-  return {
+  const result: PredictionResult = {
     matchCible: {
       bestPrediction: bestPred,
       exactScore,
@@ -415,4 +421,14 @@ export function analyzeMatch(match: Match): PredictionResult {
       away: parseFloat((awayProb * 100).toFixed(1)),
     },
   };
+
+  predictionCache.set(match.id, result);
+  
+  // Keep cache size manageable
+  if (predictionCache.size > 2000) {
+    const firstKey = predictionCache.keys().next().value;
+    if (firstKey) predictionCache.delete(firstKey);
+  }
+  
+  return result;
 }

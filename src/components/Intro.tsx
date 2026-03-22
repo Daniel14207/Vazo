@@ -7,7 +7,7 @@ export const Intro = ({ onComplete }: { onComplete: () => void }) => {
       onComplete();
     }, 5000);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, []); // Empty dependency array to run only once
 
   return (
     <div className="fixed inset-0 bg-[#0B0C10] flex flex-col items-center justify-center z-50 overflow-hidden">

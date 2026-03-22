@@ -20,7 +20,7 @@ export const Notification = ({ id, message, type, duration = 5000, onClose }: No
       }, duration);
       return () => clearTimeout(timer);
     }
-  }, [id, duration, onClose]);
+  }, [id, duration]); // Removed onClose to prevent infinite timeout reset
 
   const icons = {
     info: <Info size={20} className="text-blue-400" />,

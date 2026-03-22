@@ -184,7 +184,14 @@ function calculateFormScore(last5: ('W' | 'D' | 'L')[]): number {
   }, 0);
 }
 
+const matchCache = new Map<string, Match[]>();
+
 function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: number): Match[] {
+  const cacheKey = `${leagueId}_${time.getTime()}_${count}`;
+  if (matchCache.has(cacheKey)) {
+    return matchCache.get(cacheKey)!;
+  }
+
   let seed = time.getTime() + leagueId.charCodeAt(0);
   const random = () => {
     let x = Math.sin(seed++) * 10000;
@@ -260,5 +267,14 @@ function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: numbe
       fullOdds: generateFullOdds(homePower, awayPower, baseOdds)
     });
   }
+  
+  matchCache.set(cacheKey, matches);
+  
+  // Keep cache size manageable
+  if (matchCache.size > 100) {
+    const firstKey = matchCache.keys().next().value;
+    if (firstKey) matchCache.delete(firstKey);
+  }
+  
   return matches;
 }
