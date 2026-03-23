@@ -27,13 +27,17 @@ const CYCLE_DURATION = 45 * 60 * 1000; // 45 mins
 const SLOT_DURATION = 2 * 60 * 1000; // 2 mins
 const SLOTS_PER_CYCLE = 20;
 
-export function useVirtualLeague(): LeagueState[] {
+export function useVirtualLeague(referenceTime?: Date): LeagueState[] {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   useEffect(() => {
+    if (referenceTime) {
+      setCurrentTime(referenceTime);
+      return;
+    }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [referenceTime]);
 
   const ms = currentTime.getTime();
 
@@ -80,11 +84,9 @@ export function useVirtualLeague(): LeagueState[] {
         const slotTimeMs = targetCycleIndex * CYCLE_DURATION + targetSlotIndex * SLOT_DURATION;
         const slotTime = new Date(slotTimeMs);
         
-        const numMatches = league.id === 'caf' ? 20 : 10;
-        
         generatedSlots.push({
           time: slotTime,
-          matches: generateMatchesForLeagueSlot(league.id, slotTime, numMatches),
+          matches: generateMatchesForLeagueSlot(league.id, slotTime, 12),
           status: 'OPEN',
           isNewCycle: targetSlotIndex === 0
         });
@@ -184,14 +186,7 @@ function calculateFormScore(last5: ('W' | 'D' | 'L')[]): number {
   }, 0);
 }
 
-const matchCache = new Map<string, Match[]>();
-
 function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: number): Match[] {
-  const cacheKey = `${leagueId}_${time.getTime()}_${count}`;
-  if (matchCache.has(cacheKey)) {
-    return matchCache.get(cacheKey)!;
-  }
-
   let seed = time.getTime() + leagueId.charCodeAt(0);
   const random = () => {
     let x = Math.sin(seed++) * 10000;
@@ -267,14 +262,5 @@ function generateMatchesForLeagueSlot(leagueId: string, time: Date, count: numbe
       fullOdds: generateFullOdds(homePower, awayPower, baseOdds)
     });
   }
-  
-  matchCache.set(cacheKey, matches);
-  
-  // Keep cache size manageable
-  if (matchCache.size > 100) {
-    const firstKey = matchCache.keys().next().value;
-    if (firstKey) matchCache.delete(firstKey);
-  }
-  
   return matches;
 }

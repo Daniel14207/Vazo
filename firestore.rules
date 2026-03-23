@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user.
+    //   - email: string (required) - The user's email address.
+    //   - tokens: number (required) - Current token balance.
+    //   - dailyAnalysisCount: number (required) - Number of analyses today.
+    //   - lastAnalysisDate: string (required) - Date of last analysis.
+    //   - isAdmin: bool (optional) - Admin status.
+    //   - totalProfit: number (optional) - Total profit.
+    //   - estimatedGains: number (optional) - Total gains.
+    //   - estimatedLosses: number (optional) - Total losses.
+    //   - phoneNumber: string (optional) - User's phone number.
+    //
+    // Collection: analysisHistory
+    // Document ID: {historyId}
+    // Fields:
+    //   - uid: string (required) - User ID.
+    //   - time: string (required) - Timestamp.
+    //   - type: string (required) - Virtuel or Aviator.
+    //   - result: string (required) - Analysis result.
+    //   - match: string (optional) - Match data.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+          (request.auth.token.email == "danielrandriamampionona118@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'tokens', 'dailyAnalysisCount', 'lastAnalysisDate']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.tokens is number &&
+             data.dailyAnalysisCount is number &&
+             data.lastAnalysisDate is string;
+    }
+
+    function isValidAnalysis(data) {
+      return data.keys().hasAll(['uid', 'time', 'type', 'result']) &&
+             data.uid is string &&
+             data.time is string &&
+             data.type in ['Virtuel', 'Aviator'] &&
+             data.result is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.isAdmin == false || isAdmin());
+      
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                        (request.resource.data.isAdmin == resource.data.isAdmin || isAdmin())) ||
+                      isAdmin();
+    }
+
+    match /analysisHistory/{historyId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid && isValidAnalysis(request.resource.data);
+      
+      allow update, delete: if isAdmin();
+    }
+  }
+}

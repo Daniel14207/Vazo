@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user-specific data including tokens and profit statistics.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "tokens": { "type": "integer", "description": "The number of tokens the user currently has." },
+        "dailyAnalysisCount": { "type": "integer", "description": "Number of analyses performed today." },
+        "lastAnalysisDate": { "type": "string", "format": "date", "description": "The date of the last analysis to reset daily count." },
+        "isAdmin": { "type": "boolean", "description": "Whether the user has administrative privileges." },
+        "totalProfit": { "type": "number", "description": "Total profit accumulated by the user." },
+        "estimatedGains": { "type": "number", "description": "Total estimated gains." },
+        "estimatedLosses": { "type": "number", "description": "Total estimated losses." },
+        "phoneNumber": { "type": "string", "description": "The user's phone number (optional)." }
+      },
+      "required": ["uid", "email", "tokens", "dailyAnalysisCount"]
+    },
+    "AnalysisRecord": {
+      "title": "Analysis Record",
+      "description": "Stores details of a single analysis performed by a user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The ID of the user who performed the analysis." },
+        "time": { "type": "string", "format": "date-time", "description": "The timestamp of the analysis." },
+        "type": { "type": "string", "enum": ["Virtuel", "Aviator"], "description": "The type of analysis performed." },
+        "result": { "type": "string", "description": "The result of the analysis." },
+        "match": { "type": "string", "description": "The match or input data analyzed." }
+      },
+      "required": ["uid", "time", "type", "result"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles."
+    },
+    "/analysisHistory/{historyId}": {
+      "schema": "AnalysisRecord",
+      "description": "Collection of all analysis records."
+    }
+  }
+}

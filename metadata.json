@@ -1,5 +1,5 @@
 {
-  "name": "VITAL PRONOSTIC",
-  "description": "Application d'analyse de football virtuel et Aviator avec système de tokens et suivi de profit.",
+  "name": "Betting vital",
+  "description": "Application de pronostics sportifs avec analyse virtuelle, Aviator, système de tokens et panel admin.",
   "requestFramePermissions": []
 }
