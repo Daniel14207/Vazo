@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Component } from 'react';
 import { Menu, ShoppingCart, Star, ChevronRight, Clock, Flame, Trophy, TrendingUp, PlayCircle, Diamond, ArrowRightLeft, MoreHorizontal, CheckCircle, BarChart2, LogOut, ShieldCheck, AlertTriangle, Phone, Lock, UserPlus, HelpCircle, X, ChevronLeft, Copy, Zap, History, LayoutDashboard, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Analytics } from '@vercel/analytics/react';
 import { analyzeMatch } from './lib/predictionEngine';
 import { cn } from './lib/utils';
 import { leagues, teamsByLeague } from './lib/mockData';
@@ -2321,6 +2322,7 @@ function App() {
         </div>
       )}
       </div>
+      <Analytics />
     </ErrorBoundary>
   );
 }
